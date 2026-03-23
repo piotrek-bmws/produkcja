@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pl">
 <head>
@@ -211,13 +212,12 @@ select.form-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://
       <label class="form-label">Kolor / lakier</label>
       <select class="form-input" id="f-color">
         <option>Biały</option>
-        <option>Dąb naturalny</option>
-        <option>Szary grafit</option>
-        <option>Czarny mat</option>
-        <option>Zielony sage</option>
-        <option>Różowy pudrowy</option>
-        <option>Niebieski navy</option>
-        <option>Beż</option>
+        <option>Czarny</option>
+        <option>Dąb Sonoma</option>
+        <option>Dąb Craft Złoty</option>
+        <option>Grafit</option>
+        <option>Popiel</option>
+        <option>Kaszmir</option>
       </select>
     </div>
     <div class="modal-actions">
@@ -251,9 +251,13 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const COLORS = {
-  'Biały':'#378ADD','Dąb naturalny':'#EF9F27','Szary grafit':'#888780',
-  'Czarny mat':'#444441','Zielony sage':'#639922','Różowy pudrowy':'#D4537E',
-  'Niebieski navy':'#185FA5','Beż':'#D85A30'
+  'Biały':'#C8D8E8',
+  'Czarny':'#2C2C2A',
+  'Dąb Sonoma':'#C49A5A',
+  'Dąb Craft Złoty':'#D4A435',
+  'Grafit':'#5F5E5A',
+  'Popiel':'#A8A8A4',
+  'Kaszmir':'#C8B8A8'
 };
 const STAGE_COLORS = ['#B5D4F4','#9FE1CB','#FAC775','#F4C0D1'];
 const STAGE_TEXT = ['#0C447C','#085041','#633806','#72243E'];
