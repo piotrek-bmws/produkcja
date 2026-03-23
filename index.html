@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Produkcji — Bracia Mebelek</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;}
+.topbar{background:#fff;border-bottom:1px solid #e5e5e3;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.logo{font-size:15px;font-weight:600;color:#1a1a1a;}
+.logo span{color:#378ADD;}
+.sync-status{font-size:11px;padding:3px 10px;border-radius:100px;font-weight:500;}
+.sync-ok{background:#EAF3DE;color:#3B6D11;}
+.sync-loading{background:#FAEEDA;color:#854F0B;}
+.sync-error{background:#FCEBEB;color:#A32D2D;}
+.nav{display:flex;gap:0;background:#fff;border-bottom:1px solid #e5e5e3;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.nav-item{padding:10px 16px;font-size:13px;cursor:pointer;color:#888;border-bottom:2px solid transparent;white-space:nowrap;flex-shrink:0;}
+.nav-item.active{color:#1a1a1a;font-weight:600;border-bottom-color:#378ADD;}
+.page{display:none;padding:12px 12px 80px;}
+.page.active{display:block;}
+.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+.metric{background:#fff;border-radius:10px;padding:12px;border:1px solid #e5e5e3;}
+.metric-label{font-size:10px;color:#999;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+.metric-val{font-size:24px;font-weight:600;}
+.metric-sub{font-size:11px;color:#999;margin-top:2px;}
+.card{background:#fff;border-radius:10px;border:1px solid #e5e5e3;margin-bottom:10px;overflow:hidden;}
+.card-header{padding:12px 14px;border-bottom:1px solid #e5e5e3;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.card-title{font-size:13px;font-weight:600;}
+.product-row{padding:12px 14px;border-bottom:1px solid #f0f0ee;display:flex;align-items:center;gap:10px;}
+.product-row:last-child{border-bottom:none;}
+.color-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.prod-name{flex:1;font-size:13px;font-weight:500;min-width:0;}
+.prod-sku{font-size:11px;color:#999;margin-top:1px;}
+.prod-stats{text-align:right;flex-shrink:0;}
+.prod-stan{font-size:15px;font-weight:600;}
+.prod-min{font-size:11px;color:#999;}
+.badge{display:inline-block;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:500;}
+.badge-ok{background:#EAF3DE;color:#3B6D11;}
+.badge-warn{background:#FAEEDA;color:#854F0B;}
+.badge-danger{background:#FCEBEB;color:#A32D2D;}
+.badge-blue{background:#E6F1FB;color:#185FA5;}
+.badge-gray{background:#f0f0ee;color:#666;}
+.bar-wrap{display:flex;align-items:center;gap:6px;margin-top:4px;}
+.bar-track{flex:1;height:5px;background:#f0f0ee;border-radius:3px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:3px;}
+.btn{padding:8px 16px;font-size:13px;border-radius:8px;cursor:pointer;border:1px solid #e5e5e3;background:#fff;color:#1a1a1a;font-weight:500;transition:all .15s;}
+.btn:active{opacity:.8;transform:scale(.98);}
+.btn-primary{background:#378ADD;color:#fff;border-color:#378ADD;}
+.btn-danger{background:#FCEBEB;color:#A32D2D;border-color:#F09595;}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-block{width:100%;text-align:center;}
+.fab{position:fixed;bottom:20px;right:16px;width:52px;height:52px;border-radius:50%;background:#378ADD;color:#fff;font-size:26px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(55,138,221,.4);z-index:200;}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:flex-end;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:16px 16px 0 0;padding:20px 16px 32px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:16px;}
+.form-field{margin-bottom:12px;}
+.form-label{font-size:12px;color:#666;margin-bottom:4px;display:block;}
+.form-input{width:100%;padding:10px 12px;font-size:14px;border:1px solid #e5e5e3;border-radius:8px;background:#fff;color:#1a1a1a;-webkit-appearance:none;}
+.form-input:focus{outline:none;border-color:#378ADD;}
+.form-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.modal-actions{display:flex;gap:8px;margin-top:16px;}
+.modal-actions .btn{flex:1;}
+.stage-row{padding:12px 14px;border-bottom:1px solid #f0f0ee;display:flex;align-items:center;gap:10px;}
+.stage-row:last-child{border-bottom:none;}
+.stage-swatch{width:14px;height:14px;border-radius:3px;flex-shrink:0;}
+.stage-name{flex:1;font-size:13px;font-weight:500;}
+.stage-inputs{display:flex;gap:6px;align-items:center;}
+.stage-input{width:60px;padding:5px 8px;font-size:12px;border:1px solid #e5e5e3;border-radius:6px;text-align:center;background:#fff;color:#1a1a1a;}
+.stage-label{font-size:11px;color:#999;white-space:nowrap;}
+.bottleneck-box{background:#FAEEDA;border-left:3px solid #EF9F27;padding:10px 12px;margin:10px 12px;border-radius:0 8px 8px 0;font-size:12px;color:#633806;line-height:1.6;}
+.gantt-wrap{overflow-x:auto;padding:12px;}
+.gantt-row{display:flex;align-items:center;margin-bottom:4px;min-height:28px;}
+.gantt-label{width:110px;flex-shrink:0;font-size:11px;color:#444;padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.gantt-track{position:relative;flex:1;height:24px;background:#f5f5f3;border-radius:3px;}
+.gantt-block{position:absolute;top:2px;height:20px;border-radius:3px;display:flex;align-items:center;padding:0 5px;font-size:10px;font-weight:600;overflow:hidden;white-space:nowrap;}
+.day-header{display:flex;margin-left:110px;margin-bottom:4px;}
+.day-cell{flex:1;text-align:center;font-size:9px;color:#999;border-left:1px solid #e5e5e3;padding:2px 0;min-width:0;}
+.empty-state{text-align:center;padding:32px 16px;color:#999;font-size:13px;}
+.search-bar{padding:10px 12px;border-bottom:1px solid #e5e5e3;}
+.search-bar input{width:100%;padding:8px 12px;font-size:13px;border:1px solid #e5e5e3;border-radius:8px;background:#f5f5f3;color:#1a1a1a;}
+.search-bar input:focus{outline:none;border-color:#378ADD;background:#fff;}
+.plan-group-header{padding:10px 14px;background:#f5f5f3;border-bottom:1px solid #e5e5e3;display:flex;align-items:center;gap:8px;}
+.plan-group-title{font-size:12px;font-weight:600;color:#444;flex:1;}
+.plan-prod-row{padding:10px 14px;border-bottom:1px solid #f0f0ee;display:flex;align-items:center;gap:8px;}
+.plan-prod-row:last-child{border-bottom:none;}
+.plan-prod-name{flex:1;font-size:13px;min-width:0;}
+.plan-prod-szt{font-size:15px;font-weight:600;color:#378ADD;white-space:nowrap;}
+.plan-prod-date{font-size:11px;color:#999;white-space:nowrap;}
+.info-banner{background:#E6F1FB;border-left:3px solid #378ADD;padding:10px 12px;margin:10px 12px;border-radius:0 8px 8px 0;font-size:12px;color:#0C447C;line-height:1.6;}
+select.form-input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Bracia <span>Mebelek</span></div>
+  <div class="sync-status sync-loading" id="sync-status">Łączenie...</div>
+</div>
+
+<div class="nav">
+  <div class="nav-item active" onclick="goTo('pulpit',this)">Pulpit</div>
+  <div class="nav-item" onclick="goTo('magazyn',this)">Magazyn</div>
+  <div class="nav-item" onclick="goTo('plan',this)">Plan produkcji</div>
+  <div class="nav-item" onclick="goTo('harmonogram',this)">Harmonogram</div>
+  <div class="nav-item" onclick="goTo('ustawienia',this)">Ustawienia</div>
+</div>
+
+<!-- PULPIT -->
+<div class="page active" id="page-pulpit">
+  <div class="metrics" id="metrics"></div>
+  <div class="bottleneck-box" id="bottleneck-box" style="display:none;"></div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Alerty magazynowe</span></div>
+    <div id="alerty-list"><div class="empty-state">Ładowanie...</div></div>
+  </div>
+</div>
+
+<!-- MAGAZYN -->
+<div class="page" id="page-magazyn">
+  <div class="search-bar"><input type="text" id="mag-search" placeholder="Szukaj produktu..." oninput="renderMagazyn()"></div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Stany magazynowe</span>
+      <span class="badge badge-gray" id="mag-count"></span>
+    </div>
+    <div id="mag-list"></div>
+  </div>
+</div>
+
+<!-- PLAN -->
+<div class="page" id="page-plan">
+  <div class="info-banner" id="plan-banner"></div>
+  <div class="card" id="plan-card"></div>
+</div>
+
+<!-- HARMONOGRAM -->
+<div class="page" id="page-harmonogram">
+  <div class="card" style="margin-bottom:10px;">
+    <div class="card-header"><span class="card-title">Parametry zmiany</span></div>
+    <div style="padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:12px;color:#666;">Min/dzień:</span>
+      <input type="number" id="shift-mins" value="440" min="60" max="1440" step="10" class="stage-input" style="width:70px;" oninput="renderHarmonogram()">
+      <span style="font-size:12px;color:#666;">Widok (dni):</span>
+      <select id="view-days" class="form-input" style="width:100px;padding:5px 8px;font-size:12px;" onchange="renderHarmonogram()">
+        <option value="10">10 dni</option>
+        <option value="14" selected>14 dni</option>
+        <option value="21">21 dni</option>
+      </select>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Harmonogram potokowy</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <span style="font-size:10px;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:8px;background:#B5D4F4;border-radius:2px;display:inline-block;"></span>Rozkrój</span>
+        <span style="font-size:10px;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:8px;background:#9FE1CB;border-radius:2px;display:inline-block;"></span>Okl.</span>
+        <span style="font-size:10px;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:8px;background:#FAC775;border-radius:2px;display:inline-block;"></span>Wierc.</span>
+        <span style="font-size:10px;display:flex;align-items:center;gap:3px;"><span style="width:12px;height:8px;background:#F4C0D1;border-radius:2px;display:inline-block;"></span>Pak.</span>
+      </div>
+    </div>
+    <div id="gantt-body" class="gantt-wrap"></div>
+  </div>
+</div>
+
+<!-- USTAWIENIA -->
+<div class="page" id="page-ustawienia">
+  <div class="card" style="margin-bottom:10px;">
+    <div class="card-header"><span class="card-title">Etapy produkcji</span></div>
+    <div id="stages-list"></div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Przepustowość linii</span></div>
+    <div id="capacity-info" style="padding:12px 14px;font-size:13px;line-height:1.8;color:#444;"></div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab" onclick="openAddModal()" id="fab">+</button>
+
+<!-- MODAL: dodaj/edytuj produkt -->
+<div class="modal-bg" id="modal-product">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Nowy produkt</div>
+    <input type="hidden" id="edit-id">
+    <div class="form-field">
+      <label class="form-label">Nazwa produktu</label>
+      <input type="text" class="form-input" id="f-name" placeholder="np. Szafa OSLO 2D">
+    </div>
+    <div class="form-field">
+      <label class="form-label">SKU</label>
+      <input type="text" class="form-input" id="f-sku" placeholder="np. OSL-2D-WH">
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label class="form-label">Stan aktualny</label>
+        <input type="number" class="form-input" id="f-stan" min="0" value="0">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Minimum</label>
+        <input type="number" class="form-input" id="f-min" min="0" value="10">
+      </div>
+      <div class="form-field">
+        <label class="form-label">Bufor</label>
+        <input type="number" class="form-input" id="f-buf" min="0" value="5">
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="form-label">Kolor / lakier</label>
+      <select class="form-input" id="f-color">
+        <option>Biały</option>
+        <option>Dąb naturalny</option>
+        <option>Szary grafit</option>
+        <option>Czarny mat</option>
+        <option>Zielony sage</option>
+        <option>Różowy pudrowy</option>
+        <option>Niebieski navy</option>
+        <option>Beż</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Anuluj</button>
+      <button class="btn btn-primary" onclick="saveProduct()">Zapisz</button>
+    </div>
+    <div style="margin-top:8px;" id="delete-btn-wrap"></div>
+  </div>
+</div>
+
+<!-- MODAL: aktualizuj stan -->
+<div class="modal-bg" id="modal-stan">
+  <div class="modal">
+    <div class="modal-title">Aktualizuj stan</div>
+    <div style="font-size:14px;font-weight:500;color:#444;margin-bottom:12px;" id="stan-product-name"></div>
+    <input type="hidden" id="stan-id">
+    <div class="form-field">
+      <label class="form-label">Nowy stan magazynowy (szt.)</label>
+      <input type="number" class="form-input" id="f-new-stan" min="0" style="font-size:20px;font-weight:600;text-align:center;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeStanModal()">Anuluj</button>
+      <button class="btn btn-primary" onclick="saveStan()">Zapisz stan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://obuvqwsmfqcoywgjrrqj.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9idXZxd3NtZnFjb3l3Z2pycnFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNzE3MTgsImV4cCI6MjA4OTg0NzcxOH0.XloWtscX-dzjLUSOXBn7SZp2ZqlOAslacAQnZI9r2RI';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const COLORS = {
+  'Biały':'#378ADD','Dąb naturalny':'#EF9F27','Szary grafit':'#888780',
+  'Czarny mat':'#444441','Zielony sage':'#639922','Różowy pudrowy':'#D4537E',
+  'Niebieski navy':'#185FA5','Beż':'#D85A30'
+};
+const STAGE_COLORS = ['#B5D4F4','#9FE1CB','#FAC775','#F4C0D1'];
+const STAGE_TEXT = ['#0C447C','#085041','#633806','#72243E'];
+const STAGE_NAMES = ['Rozkrój','Okleinowanie','Wiercenie','Pakowanie'];
+
+let products = [];
+let stages = [{id:1,name:'Rozkrój',base_mins:2.5,workers:2},{id:2,name:'Okleinowanie',base_mins:3.5,workers:2},{id:3,name:'Wiercenie',base_mins:4.0,workers:1},{id:4,name:'Pakowanie',base_mins:4.5,workers:1}];
+let activePage = 'pulpit';
+
+function setSyncStatus(state, text) {
+  const el = document.getElementById('sync-status');
+  el.textContent = text;
+  el.className = 'sync-status sync-' + state;
+}
+
+async function loadData() {
+  setSyncStatus('loading', 'Synchronizacja...');
+  try {
+    const [prodRes, stageRes] = await Promise.all([
+      sb.from('products').select('*').order('name'),
+      sb.from('stages').select('*').order('id')
+    ]);
+    if (prodRes.error) throw prodRes.error;
+    if (stageRes.error) throw stageRes.error;
+    products = prodRes.data || [];
+    if (stageRes.data && stageRes.data.length) stages = stageRes.data;
+    setSyncStatus('ok', 'Zsynchronizowano');
+    renderAll();
+  } catch(e) {
+    setSyncStatus('error', 'Błąd połączenia');
+    console.error(e);
+  }
+}
+
+// realtime
+sb.channel('products-changes')
+  .on('postgres_changes', {event:'*', schema:'public', table:'products'}, () => loadData())
+  .on('postgres_changes', {event:'*', schema:'public', table:'stages'}, () => loadData())
+  .subscribe();
+
+function needed(p) { return Math.max(0, p.min_stan + p.bufor - p.stan); }
+function status(p) {
+  if (p.stan >= p.min_stan + p.bufor) return 'ok';
+  if (p.stan >= p.min_stan) return 'warn';
+  return 'danger';
+}
+function pct(p) { return Math.min(100, Math.round(p.stan / Math.max(1, p.min_stan + p.bufor) * 100)); }
+function effMins(s) { return s.base_mins / s.workers; }
+function throughput(s, shiftMins) { return Math.floor(shiftMins / effMins(s)); }
+function bottleneckIdx(shiftMins) {
+  let min = Infinity, idx = 0;
+  stages.forEach((s,i) => { const t = throughput(s, shiftMins); if(t < min){min=t;idx=i;} });
+  return idx;
+}
+function lineCap(shiftMins) { return throughput(stages[bottleneckIdx(shiftMins)], shiftMins); }
+
+function renderAll() {
+  renderMetrics();
+  renderAlerty();
+  if(activePage==='magazyn') renderMagazyn();
+  if(activePage==='plan') renderPlan();
+  if(activePage==='harmonogram') renderHarmonogram();
+  if(activePage==='ustawienia') renderUstawienia();
+}
+
+function renderMetrics() {
+  const shiftMins = +(document.getElementById('shift-mins')||{value:440}).value||440;
+  const danger = products.filter(p=>status(p)==='danger').length;
+  const warn = products.filter(p=>status(p)==='warn').length;
+  const totalSzt = products.filter(p=>needed(p)>0).reduce((s,p)=>s+needed(p),0);
+  const cap = stages.length ? lineCap(shiftMins) : 0;
+  const bn = stages.length ? STAGE_NAMES[bottleneckIdx(shiftMins)] : '-';
+  document.getElementById('metrics').innerHTML = `
+    <div class="metric"><div class="metric-label">Krytyczne braki</div><div class="metric-val" style="color:#A32D2D;">${danger}</div><div class="metric-sub">poniżej minimum</div></div>
+    <div class="metric"><div class="metric-label">Ostrzeżenia</div><div class="metric-val" style="color:#854F0B;">${warn}</div><div class="metric-sub">bufor niski</div></div>
+    <div class="metric"><div class="metric-label">Do produkcji</div><div class="metric-val" style="color:#185FA5;">${totalSzt}</div><div class="metric-sub">szt. łącznie</div></div>
+    <div class="metric"><div class="metric-label">Przepustowość</div><div class="metric-val">${cap}</div><div class="metric-sub">szt./dzień (garło: ${bn})</div></div>
+  `;
+  const bnBox = document.getElementById('bottleneck-box');
+  if(stages.length) {
+    const bi = bottleneckIdx(shiftMins);
+    const withExtra = Math.floor(shiftMins / (stages[bi].base_mins / (stages[bi].workers + 1)));
+    bnBox.style.display = 'block';
+    bnBox.innerHTML = `Wąskie gardło: <strong>${STAGE_NAMES[bi]}</strong> — ${cap} szt./dzień. Dodanie 1 osoby na ${STAGE_NAMES[bi].toLowerCase()} zwiększyłoby przepustowość do <strong>${withExtra} szt./dzień</strong>.`;
+  }
+}
+
+function renderAlerty() {
+  const el = document.getElementById('alerty-list');
+  const alerts = products.filter(p => status(p) !== 'ok').sort((a,b) => {
+    const order = {danger:0,warn:1};
+    return order[status(a)] - order[status(b)];
+  });
+  if (!alerts.length) { el.innerHTML = `<div class="empty-state">Wszystkie stany powyżej minimum</div>`; return; }
+  el.innerHTML = alerts.map(p => {
+    const s = status(p);
+    const bclass = s==='danger'?'badge-danger':'badge-warn';
+    const blabel = s==='danger'?'krytyczne':'ostrzeżenie';
+    return `<div class="product-row" onclick="openStanModal('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.stan})">
+      <div class="color-dot" style="background:${COLORS[p.color]||'#999'};"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:500;">${p.name}</div>
+        <div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${pct(p)}%;background:${s==='danger'?'#E24B4A':'#EF9F27'};"></div></div><span style="font-size:10px;color:#999;">${p.stan}/${p.min_stan+p.bufor}</span></div>
+      </div>
+      <span class="badge ${bclass}">${blabel}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderMagazyn() {
+  const q = (document.getElementById('mag-search')||{value:''}).value.toLowerCase();
+  const filtered = products.filter(p => !q || p.name.toLowerCase().includes(q) || (p.sku||'').toLowerCase().includes(q));
+  document.getElementById('mag-count').textContent = filtered.length + ' prod.';
+  const el = document.getElementById('mag-list');
+  if (!filtered.length) { el.innerHTML = `<div class="empty-state">Brak wyników</div>`; return; }
+  el.innerHTML = filtered.map(p => {
+    const s = status(p), pc = pct(p);
+    const bc = s==='ok'?'#639922':s==='warn'?'#EF9F27':'#E24B4A';
+    const bclass = s==='ok'?'badge-ok':s==='warn'?'badge-warn':'badge-danger';
+    const blabel = s==='ok'?'ok':s==='warn'?'bufor niski':'krytyczne';
+    return `<div class="product-row">
+      <div class="color-dot" style="background:${COLORS[p.color]||'#999'};"></div>
+      <div style="flex:1;min-width:0;" onclick="openEditModal(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+        <div class="prod-name">${p.name}</div>
+        <div class="prod-sku">${p.sku||''} &nbsp;·&nbsp; min: ${p.min_stan} &nbsp;·&nbsp; bufor: ${p.bufor}</div>
+        <div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${pc}%;background:${bc};"></div></div></div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div class="prod-stan" style="color:${bc};">${p.stan}</div>
+        <div class="prod-min">szt.</div>
+        <span class="badge ${bclass}" style="margin-top:3px;">${blabel}</span>
+      </div>
+      <button class="btn btn-sm" style="flex-shrink:0;margin-left:6px;" onclick="openStanModal('${p.id}','${p.name.replace(/'/g,"\\'")}',${p.stan})">Aktualizuj</button>
+    </div>`;
+  }).join('');
+}
+
+function buildGroups() {
+  const shiftMins = +(document.getElementById('shift-mins')||{value:440}).value||440;
+  const toMake = products.filter(p => needed(p) > 0);
+  if (!toMake.length) return [];
+  const byColor = {};
+  toMake.forEach(p => { if(!byColor[p.color]) byColor[p.color]=[]; byColor[p.color].push(p); });
+  const groups = [];
+  Object.entries(byColor).forEach(([color, prods]) => {
+    const critical = prods.some(p => status(p)==='danger');
+    const totalSzt = prods.reduce((s,p) => s+needed(p), 0);
+    const stageDurMins = stages.map(s => totalSzt * effMins(s));
+    groups.push({color, prods, critical, totalSzt, stageDurMins});
+  });
+  groups.sort((a,b) => b.critical - a.critical || b.totalSzt - a.totalSzt);
+  let rozkrojCursor = 0;
+  groups.forEach(g => {
+    g.stageStartMins = [rozkrojCursor];
+    for(let s=1;s<4;s++) g.stageStartMins.push(g.stageStartMins[s-1]+g.stageDurMins[s-1]);
+    rozkrojCursor += g.stageDurMins[0];
+    g.endMin = g.stageStartMins[3] + g.stageDurMins[3];
+  });
+  return groups;
+}
+
+function renderPlan() {
+  const shiftMins = +(document.getElementById('shift-mins')||{value:440}).value||440;
+  const groups = buildGroups();
+  const banner = document.getElementById('plan-banner');
+  const card = document.getElementById('plan-card');
+  if (!groups.length) {
+    banner.innerHTML = 'Wszystkie produkty mają wystarczający stan — nic do produkcji!';
+    card.innerHTML = '';
+    return;
+  }
+  const totalSzt = groups.reduce((s,g) => s+g.totalSzt, 0);
+  const maxEnd = Math.max(...groups.map(g=>g.endMin));
+  const totalDays = Math.ceil(maxEnd/shiftMins);
+  const now = new Date();
+  function addWorkdays(n) {
+    const d = new Date(now); let added=0;
+    while(added<n){d.setDate(d.getDate()+1);if(d.getDay()!==0&&d.getDay()!==6)added++;}
+    return d;
+  }
+  function fmt(d){return d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'});}
+  banner.innerHTML = `Łącznie <strong>${totalSzt} szt.</strong> do wyprodukowania · Zakończenie: <strong>${fmt(addWorkdays(totalDays))}</strong> (${totalDays} dni rob.)`;
+  let html = '';
+  groups.forEach(g => {
+    const endDate = addWorkdays(Math.ceil(g.endMin/shiftMins));
+    html += `<div class="plan-group-header">
+      <div class="color-dot" style="background:${COLORS[g.color]||'#999'};"></div>
+      <span class="plan-group-title">${g.color} — ${g.totalSzt} szt.</span>
+      ${g.critical?'<span class="badge badge-danger">priorytet</span>':''}
+      <span style="font-size:11px;color:#999;">do ${fmt(endDate)}</span>
+    </div>`;
+    g.prods.forEach(p => {
+      const n = needed(p);
+      const s = status(p);
+      const prodEndMin = g.stageStartMins[3] + n * effMins(stages[3]);
+      const prodEndDate = addWorkdays(Math.ceil(prodEndMin/shiftMins));
+      html += `<div class="plan-prod-row">
+        <div class="plan-prod-name">${p.name}<br><span style="font-size:11px;color:#999;">${p.sku||''}</span></div>
+        <span class="badge ${s==='danger'?'badge-danger':'badge-warn'}" style="font-size:10px;">${s==='danger'?'pilne':'std'}</span>
+        <div style="text-align:right;">
+          <div class="plan-prod-szt">${n} szt.</div>
+          <div class="plan-prod-date">do ${fmt(prodEndDate)}</div>
+        </div>
+      </div>`;
+    });
+  });
+  card.innerHTML = html;
+}
+
+function renderHarmonogram() {
+  renderMetrics();
+  renderPlan();
+  const shiftMins = +(document.getElementById('shift-mins').value)||440;
+  const viewDays = +(document.getElementById('view-days').value)||14;
+  const groups = buildGroups();
+  const el = document.getElementById('gantt-body');
+  if (!groups.length) { el.innerHTML = `<div class="empty-state">Brak produkcji do zaplanowania</div>`; return; }
+  const now = new Date();
+  function getWD(n){const d=new Date(now);let a=0;while(a<n){d.setDate(d.getDate()+1);if(d.getDay()!==0&&d.getDay()!==6)a++;}return d;}
+  function fmt(d){return d.toLocaleDateString('pl-PL',{day:'2-digit',month:'2-digit'});}
+  const DAY_PX = 36;
+  let html = `<div style="min-width:${110+viewDays*DAY_PX}px;">`;
+  html += `<div class="day-header">`;
+  for(let d=1;d<=viewDays;d++) html+=`<div class="day-cell" style="width:${DAY_PX}px;flex:none;">${fmt(getWD(d))}</div>`;
+  html += `</div>`;
+  groups.forEach(g => {
+    html += `<div class="gantt-row"><div class="gantt-label" style="font-weight:600;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[g.color]||'#999'};margin-right:4px;vertical-align:middle;"></span>${g.color}</div><div class="gantt-track" style="width:${viewDays*DAY_PX}px;">`;
+    for(let s=0;s<4;s++){
+      const startPx = (g.stageStartMins[s]/shiftMins)*DAY_PX;
+      const durPx = Math.max((g.stageDurMins[s]/shiftMins)*DAY_PX-2, 4);
+      if(startPx>=viewDays*DAY_PX) continue;
+      const w = Math.min(durPx, viewDays*DAY_PX-startPx-2);
+      html+=`<div class="gantt-block" style="left:${startPx}px;width:${w}px;background:${STAGE_COLORS[s]};color:${STAGE_TEXT[s]};">${w>40?STAGE_NAMES[s].substring(0,4)+'.':(w>20?(s+1)+'.':'')}</div>`;
+    }
+    html += `</div></div>`;
+    g.prods.forEach(p=>{
+      const n=needed(p);
+      html+=`<div class="gantt-row"><div class="gantt-label" style="padding-left:14px;color:#888;font-size:10px;">${p.name.substring(0,14)} <span style="color:#bbb;">${n}szt</span></div><div class="gantt-track" style="width:${viewDays*DAY_PX}px;">`;
+      for(let s=0;s<4;s++){
+        const sm=n*effMins(stages[s]);
+        const startPx=(g.stageStartMins[s]/shiftMins)*DAY_PX;
+        const durPx=Math.max((sm/shiftMins)*DAY_PX-2,3);
+        if(startPx>=viewDays*DAY_PX)continue;
+        const w=Math.min(durPx,viewDays*DAY_PX-startPx-2);
+        html+=`<div style="position:absolute;left:${startPx}px;top:8px;width:${w}px;height:8px;background:${STAGE_COLORS[s]};border-radius:2px;opacity:.4;"></div>`;
+      }
+      html+=`</div></div>`;
+    });
+    html+=`<div style="height:6px;"></div>`;
+  });
+  html+=`</div>`;
+  el.innerHTML=html;
+}
+
+function renderUstawienia() {
+  const shiftMins = +(document.getElementById('shift-mins')||{value:440}).value||440;
+  const el = document.getElementById('stages-list');
+  el.innerHTML = stages.map((s,i) => {
+    const tp = throughput(s, shiftMins);
+    const bn = bottleneckIdx(shiftMins)===i;
+    return `<div class="stage-row" style="${bn?'background:#FAEEDA;':''}">
+      <div class="stage-swatch" style="background:${STAGE_COLORS[i]};${bn?'outline:1.5px solid #D4537E;outline-offset:1px;':''}"></div>
+      <div class="stage-name">${s.name}${bn?' <span class="badge badge-warn" style="font-size:9px;padding:1px 5px;">garło</span>':''}</div>
+      <div class="stage-inputs">
+        <div><div class="stage-label" style="text-align:center;">min/szt</div><input type="number" class="stage-input" value="${s.base_mins}" min=".5" step=".5" onchange="updateStage(${s.id},'base_mins',+this.value)"></div>
+        <div><div class="stage-label" style="text-align:center;">osoby</div><input type="number" class="stage-input" value="${s.workers}" min="1" step="1" onchange="updateStage(${s.id},'workers',+this.value)"></div>
+        <div><div class="stage-label" style="text-align:center;">szt/dzień</div><div style="width:60px;padding:5px;font-size:12px;font-weight:600;text-align:center;color:${bn?'#854F0B':'#3B6D11'};">${tp}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+  const cap = lineCap(shiftMins);
+  const bi = bottleneckIdx(shiftMins);
+  document.getElementById('capacity-info').innerHTML = `
+    Przepustowość linii: <strong>${cap} szt./dzień</strong><br>
+    Miesięcznie (~22 dni): <strong>${cap*22} szt.</strong><br>
+    Wąskie gardło: <strong>${STAGE_NAMES[bi]}</strong><br>
+    <span style="font-size:12px;color:#999;">Zmiana czasów etapów i liczby pracowników automatycznie aktualizuje harmonogram.</span>
+  `;
+}
+
+async function updateStage(id, field, val) {
+  setSyncStatus('loading','Zapisywanie...');
+  const {error} = await sb.from('stages').update({[field]:Math.max(field==='workers'?1:0.5,val)}).eq('id',id);
+  if(error){setSyncStatus('error','Błąd zapisu');return;}
+  await loadData();
+}
+
+function openAddModal() {
+  document.getElementById('modal-title').textContent = 'Nowy produkt';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-sku').value = '';
+  document.getElementById('f-stan').value = 0;
+  document.getElementById('f-min').value = 10;
+  document.getElementById('f-buf').value = 5;
+  document.getElementById('f-color').value = 'Biały';
+  document.getElementById('delete-btn-wrap').innerHTML = '';
+  document.getElementById('modal-product').classList.add('open');
+}
+
+function openEditModal(p) {
+  if(typeof p === 'string') p = JSON.parse(p.replace(/&quot;/g,'"'));
+  document.getElementById('modal-title').textContent = 'Edytuj produkt';
+  document.getElementById('edit-id').value = p.id;
+  document.getElementById('f-name').value = p.name;
+  document.getElementById('f-sku').value = p.sku||'';
+  document.getElementById('f-stan').value = p.stan;
+  document.getElementById('f-min').value = p.min_stan;
+  document.getElementById('f-buf').value = p.bufor;
+  document.getElementById('f-color').value = p.color||'Biały';
+  document.getElementById('delete-btn-wrap').innerHTML = `<button class="btn btn-danger btn-block" onclick="deleteProduct('${p.id}')">Usuń produkt</button>`;
+  document.getElementById('modal-product').classList.add('open');
+}
+
+function closeModal() { document.getElementById('modal-product').classList.remove('open'); }
+
+async function saveProduct() {
+  const id = document.getElementById('edit-id').value;
+  const data = {
+    name: document.getElementById('f-name').value.trim(),
+    sku: document.getElementById('f-sku').value.trim(),
+    stan: +document.getElementById('f-stan').value||0,
+    min_stan: +document.getElementById('f-min').value||0,
+    bufor: +document.getElementById('f-buf').value||0,
+    color: document.getElementById('f-color').value,
+    updated_at: new Date().toISOString()
+  };
+  if(!data.name){alert('Podaj nazwę produktu');return;}
+  setSyncStatus('loading','Zapisywanie...');
+  closeModal();
+  const {error} = id
+    ? await sb.from('products').update(data).eq('id',id)
+    : await sb.from('products').insert(data);
+  if(error){setSyncStatus('error','Błąd zapisu');console.error(error);return;}
+  await loadData();
+}
+
+async function deleteProduct(id) {
+  if(!confirm('Na pewno usunąć ten produkt?'))return;
+  closeModal();
+  setSyncStatus('loading','Usuwanie...');
+  const {error} = await sb.from('products').delete().eq('id',id);
+  if(error){setSyncStatus('error','Błąd');return;}
+  await loadData();
+}
+
+function openStanModal(id, name, stan) {
+  document.getElementById('stan-id').value = id;
+  document.getElementById('stan-product-name').textContent = name;
+  document.getElementById('f-new-stan').value = stan;
+  document.getElementById('modal-stan').classList.add('open');
+}
+function closeStanModal() { document.getElementById('modal-stan').classList.remove('open'); }
+
+async function saveStan() {
+  const id = document.getElementById('stan-id').value;
+  const val = +document.getElementById('f-new-stan').value;
+  setSyncStatus('loading','Zapisywanie...');
+  closeStanModal();
+  const {error} = await sb.from('products').update({stan:val, updated_at:new Date().toISOString()}).eq('id',id);
+  if(error){setSyncStatus('error','Błąd zapisu');return;}
+  await loadData();
+}
+
+function goTo(page, el) {
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-'+page).classList.add('active');
+  activePage = page;
+  const fab = document.getElementById('fab');
+  fab.style.display = page==='magazyn' ? 'flex' : 'none';
+  if(page==='magazyn') renderMagazyn();
+  if(page==='plan') renderPlan();
+  if(page==='harmonogram') renderHarmonogram();
+  if(page==='ustawienia') renderUstawienia();
+}
+
+document.getElementById('fab').style.display='none';
+loadData();
+</script>
+</body>
+</html>
